@@ -28,6 +28,8 @@ dispatch --owner AMDEPYC --repo dispatch --tag example
 dispatch --owner AMDEPYC --repo dispatch --tag example workload-7
 ```
 
+See [Permissions](#permissions) section  for more on authenticating with GitHub.
+
 ## How It Works
 
 ```mermaid
@@ -128,3 +130,34 @@ Each workload progresses through these states:
 4. **⚡ Booting** → Workload is booting (via `beacon boot`)
 5. **📝 Reported** → Results submitted (via `beacon report`)
 6. **🏁 Finished/Failed** → Final state
+
+## Permissions
+
+dispatch uses GitHub APIs to download Release Assets and to create Issues in the repo specified on the dispatch command line. Certain permissions are needed for this to work.
+
+### Option 1
+
+Before running dispatch, run 'gh auth login' and choose to authenticate via the web browser flow.
+
+### Option 2
+
+Before running dispatch, run 'gh auth login' and choose to authenticate by pasting an authentication token. 
+
+#### Fine-grained PAT
+  
+If using a fine-grained token (PAT), it must have, at a minimum, the following permissions:
+    
+- `Contents` Read-only access
+- `Issues` Read and write access
+  
+#### Classic PAT
+  
+If using a classic token (PAT), it must have, at a minimum, the `repo` permission.
+
+### Option 3
+
+When running dispatch, use the --token option and specify either a fine-grained or a classic PAT as described above.
+
+### Option 4
+
+Before running dispatch, set an environment variable named GITHUB_TOKEN to either a fine-grained or a classic PAT as described above.
