@@ -154,13 +154,17 @@ impl GitHub {
         println!("  Re-run dispatch.");
         println!();
         println!("Option 2");
-        println!("  Run 'gh auth login' and choose to authenticate by pasting an authentication token.");
+        println!(
+            "  Run 'gh auth login' and choose to authenticate by pasting an authentication token."
+        );
         println!("    Fine-grained authentication token (PAT)");
         println!("      If using a fine-grained PAT, it must have, at a minimum, the following permissions:");
         println!("        Contents: Read-only access");
         println!("        Issues: Read and write access");
         println!("    Classic PAT");
-        println!("      If using a classic PAT, it must have, at a minimum, the following permissions:");
+        println!(
+            "      If using a classic PAT, it must have, at a minimum, the following permissions:"
+        );
         println!("        repo");
         println!("  Re-run dispatch.");
         println!();
