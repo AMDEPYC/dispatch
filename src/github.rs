@@ -149,21 +149,24 @@ impl GitHub {
 
         println!("No GitHub token found. Please authenticate with GitHub.");
         println!();
-        println!("Option 1 - Use GitHub CLI (recommended):");
-        println!("  gh auth login");
-        println!("  # Re-run this command");
+        println!("Option 1");
+        println!("  Run 'gh auth login' and choose to authenticate via the web browser flow.");
         println!();
-        println!("Option 2 - Create a Personal Access Token manually:");
-        println!("  1. Visit: https://github.com/settings/tokens/new");
-        println!("  2. Select scopes (permissions needed):");
-        println!("     • Repository access: Select your target repository");
-        println!("     • Repository permissions:");
-        println!("       - Contents: Read (for downloading release assets)");
-        println!("       - Issues: Write (for creating issues)");
-        println!("  3. Click 'Generate token'");
+        println!("Option 2");
+        println!("  run 'gh auth login' and choose to authenticate by pasting an authentication token.");
+        println!("    Fine-grained authentication token (PAT)");
+        println!("      If using a fine-grained PAT, it must have, at a minimum, the following permissions:");
+        println!("        Contents: Read-only access");
+        println!("        Issues: Read and write access");
+        println!("    Classic PAT");
+        println!("      If using a classic PAT, it must have, at a minimum, the following permissions:");
+        println!("        repo");
         println!();
-        println!("  export GITHUB_TOKEN=<YOUR_TOKEN>");
-        println!("  # Re-run this command");
+        println!("Option 3");
+        println!("  Use the --token option and specify either a fine-grained or a classic PAT as described above.");
+        println!();
+        println!("Option 4");
+        println!("  Set an environment variable named GITHUB_TOKEN to either a fine-grained or a classic PAT as described above.");
         println!();
 
         anyhow::bail!("GitHub authentication required. Please follow the instructions above.");
