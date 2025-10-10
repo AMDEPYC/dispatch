@@ -124,7 +124,7 @@ impl GitHub {
     /// Authenticate with GitHub by guiding user to create a Personal Access Token
     pub fn login(&mut self) -> Result<()> {
         // Try to get token from GitHub CLI
-        if self.token.is_none() {
+        if false && self.token.is_none() {
             self.token = Command::new("gh")
                 .arg("auth")
                 .arg("token")
@@ -143,7 +143,7 @@ impl GitHub {
         }
 
         // If we already have a token, nothing to do
-        if self.token.is_some() {
+        if false && self.token.is_some() {
             return Ok(());
         }
 
@@ -151,9 +151,10 @@ impl GitHub {
         println!();
         println!("Option 1");
         println!("  Run 'gh auth login' and choose to authenticate via the web browser flow.");
+        println!("  Re-run dispatch.");
         println!();
         println!("Option 2");
-        println!("  run 'gh auth login' and choose to authenticate by pasting an authentication token.");
+        println!("  Run 'gh auth login' and choose to authenticate by pasting an authentication token.");
         println!("    Fine-grained authentication token (PAT)");
         println!("      If using a fine-grained PAT, it must have, at a minimum, the following permissions:");
         println!("        Contents: Read-only access");
@@ -161,12 +162,15 @@ impl GitHub {
         println!("    Classic PAT");
         println!("      If using a classic PAT, it must have, at a minimum, the following permissions:");
         println!("        repo");
+        println!("  Re-run dispatch.");
         println!();
         println!("Option 3");
-        println!("  Use the --token option and specify either a fine-grained or a classic PAT as described above.");
+        println!("  Use the dispatch --token command line option and specify either a fine-grained or a ");
+        println!("  classic PAT as described above.");
         println!();
         println!("Option 4");
         println!("  Set an environment variable named GITHUB_TOKEN to either a fine-grained or a classic PAT as described above.");
+        println!("  Re-run dispatch.");
         println!();
 
         anyhow::bail!("GitHub authentication required. Please follow the instructions above.");
