@@ -169,7 +169,8 @@ impl GitHub {
         println!("  classic PAT as described above.");
         println!();
         println!("Option 4");
-        println!("  Set an environment variable named GITHUB_TOKEN to either a fine-grained or a classic PAT as described above.");
+        println!("  Set an environment variable named GITHUB_TOKEN to either a fine-grained or a classic");
+        println!("  PAT as described above.");
         println!("  Re-run dispatch.");
         println!();
 
