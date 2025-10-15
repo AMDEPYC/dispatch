@@ -19,7 +19,7 @@ mod tui;
 use std::sync::Arc;
 
 use crate::avahi::AvahiService;
-use crate::github::GitHub;
+use crate::github::GitHubArgs;
 use crate::http::Server;
 use crate::tui::{Status, Throbbing};
 
@@ -35,7 +35,7 @@ use tokio::sync::Mutex;
 #[command(about = std::env!("CARGO_PKG_DESCRIPTION"))]
 struct Args {
     #[command(flatten)]
-    github: GitHub,
+    github: GitHubArgs,
 
     /// Address and port to bind to
     #[arg(short = 'b', long, default_value = "0.0.0.0:8080")]
@@ -50,10 +50,10 @@ struct Args {
 #[allow(clippy::too_many_lines)]
 async fn main() -> Result<()> {
     // Parse arguments
-    let mut args = Args::parse();
+    let args = Args::parse();
 
     // Ensure we're authenticated with GitHub
-    args.github.login()?;
+    let github = Arc::new(args.github.login()?);
 
     // Bind to our server port
     let listener = TcpListener::bind(&args.bind).await?;
@@ -61,8 +61,7 @@ async fn main() -> Result<()> {
     let path = Arc::new(args.path);
 
     // Load the github assets
-    let assets = args
-        .github
+    let assets = github
         .assets()
         .throbbing("Loading GitHub assets...")
         .await?;
@@ -72,7 +71,6 @@ async fn main() -> Result<()> {
     status.lock().await.render()?;
 
     // Create the HTTP server
-    let github = Arc::new(args.github);
     let server = Server::new(listener, status.clone(), github, path.clone())?;
 
     // Create TXT records
