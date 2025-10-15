@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::process::Command;
 
 use anyhow::Result;
@@ -82,7 +82,7 @@ struct Release {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Report {
+pub struct Report<M = String> {
     title: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -93,6 +93,9 @@ pub struct Report {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     assignees: Option<Vec<String>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    milestone: Option<M>,
 }
 
 #[derive(Debug, Clone, clap::Args)]
@@ -120,7 +123,7 @@ pub struct GitHubArgs {
 
 impl GitHubArgs {
     /// Authenticate with GitHub by guiding user to create a Personal Access Token
-    pub fn login(mut self) -> Result<GitHub> {
+    pub async fn login(mut self) -> Result<GitHub> {
         // Try to get token from GitHub CLI
         if self.token.is_none() {
             self.token = Command::new("gh")
@@ -142,7 +145,7 @@ impl GitHubArgs {
 
         // If we already have a token, create the client.
         if self.token.is_some() {
-            return GitHub::new(self);
+            return GitHub::new(self).await;
         }
 
         println!("No GitHub token found. Please authenticate with GitHub.");
@@ -168,16 +171,24 @@ impl GitHubArgs {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Milestone {
+    title: String,
+    number: u64,
+}
+
 #[derive(Debug)]
 pub struct GitHub {
     args: GitHubArgs,
     client: Client,
+    milestones: HashMap<String, u64>,
 }
 
 impl GitHub {
     const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+    const PER_PAGE: u32 = 100;
 
-    fn new(args: GitHubArgs) -> Result<Self> {
+    async fn new(args: GitHubArgs) -> Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert("Accept", "application/vnd.github+json".parse()?);
         headers.insert("User-Agent", Self::USER_AGENT.parse()?);
@@ -188,7 +199,34 @@ impl GitHub {
         }
 
         let client = Client::builder().default_headers(headers).build()?;
-        Ok(Self { args, client })
+        let mut milestones = HashMap::new();
+
+        // Load all milestones...
+        for n in 1.. {
+            let url = format!(
+                "https://api.github.com/repos/{}/{}/milestones?state=all&per_page={}&page={}",
+                args.owner,
+                args.repo,
+                Self::PER_PAGE,
+                n
+            );
+
+            let response = client.get(&url).send().await?;
+            let page: Vec<Milestone> = response.json().await?;
+            if page.is_empty() {
+                break;
+            }
+
+            for milestone in page {
+                milestones.insert(milestone.title, milestone.number);
+            }
+        }
+
+        Ok(Self {
+            args,
+            client,
+            milestones,
+        })
     }
 
     pub async fn assets(&self) -> Result<BTreeSet<Asset>> {
@@ -213,7 +251,22 @@ impl GitHub {
         Ok(assets)
     }
 
+    fn milestone(&self, title: &str) -> Result<u64> {
+        self.milestones
+            .get(title)
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("Milestone '{}' not found", title))
+    }
+
     pub async fn report(&self, report: Report) -> Result<()> {
+        let report = Report {
+            title: report.title,
+            body: report.body,
+            labels: report.labels,
+            assignees: report.assignees,
+            milestone: report.milestone.map(|t| self.milestone(&t)).transpose()?,
+        };
+
         let url = format!(
             "https://api.github.com/repos/{}/{}/issues",
             self.args.owner, self.args.repo
