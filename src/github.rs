@@ -251,20 +251,19 @@ impl GitHub {
         Ok(assets)
     }
 
-    fn milestone(&self, title: &str) -> Result<u64> {
-        self.milestones
-            .get(title)
-            .copied()
-            .ok_or_else(|| anyhow::anyhow!("Milestone '{}' not found", title))
-    }
-
     pub async fn report(&self, report: Report) -> Result<()> {
         let report = Report {
             title: report.title,
             body: report.body,
             labels: report.labels,
             assignees: report.assignees,
-            milestone: report.milestone.map(|t| self.milestone(&t)).transpose()?,
+
+            // We make a best-effort attempt to add the milestone. But if the
+            // milestone isn't found on the repo, we still file an issue so
+            // that we don't lose the results of the test run.
+            milestone: report
+                .milestone
+                .and_then(|t| self.milestones.get(&t).copied()),
         };
 
         let url = format!(
