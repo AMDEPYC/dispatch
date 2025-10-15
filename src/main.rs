@@ -47,13 +47,12 @@ struct Args {
 }
 
 #[tokio::main]
-#[allow(clippy::too_many_lines)]
 async fn main() -> Result<()> {
     // Parse arguments
     let args = Args::parse();
 
     // Ensure we're authenticated with GitHub
-    let github = Arc::new(args.github.login()?);
+    let github = Arc::new(args.github.login().await?);
 
     // Bind to our server port
     let listener = TcpListener::bind(&args.bind).await?;
