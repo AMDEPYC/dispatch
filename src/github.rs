@@ -96,7 +96,7 @@ pub struct Report {
 }
 
 #[derive(Debug, Clone, clap::Args)]
-pub struct GitHub {
+pub struct GitHubArgs {
     /// GitHub token for API access
     #[arg(long, env = "GITHUB_TOKEN")]
     pub token: Option<String>,
@@ -105,7 +105,7 @@ pub struct GitHub {
     #[arg(short = 'o', long)]
     pub owner: String,
 
-    /// GitHub repository name  
+    /// GitHub repository name
     #[arg(short = 'r', long)]
     pub repo: String,
 
@@ -118,11 +118,9 @@ pub struct GitHub {
     pub filter: Vec<String>,
 }
 
-impl GitHub {
-    const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
-
+impl GitHubArgs {
     /// Authenticate with GitHub by guiding user to create a Personal Access Token
-    pub fn login(&mut self) -> Result<()> {
+    pub fn login(mut self) -> Result<GitHub> {
         // Try to get token from GitHub CLI
         if self.token.is_none() {
             self.token = Command::new("gh")
@@ -142,9 +140,9 @@ impl GitHub {
                 });
         }
 
-        // If we already have a token, nothing to do
+        // If we already have a token, create the client.
         if self.token.is_some() {
-            return Ok(());
+            return GitHub::new(self);
         }
 
         println!("No GitHub token found. Please authenticate with GitHub.");
@@ -168,31 +166,38 @@ impl GitHub {
 
         anyhow::bail!("GitHub authentication required. Please follow the instructions above.");
     }
+}
 
-    fn client(&self) -> Client {
+#[derive(Debug)]
+pub struct GitHub {
+    args: GitHubArgs,
+    client: Client,
+}
+
+impl GitHub {
+    const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
+    fn new(args: GitHubArgs) -> Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert("Accept", "application/vnd.github+json".parse().unwrap());
-        headers.insert("User-Agent", Self::USER_AGENT.parse().unwrap());
+        headers.insert("Accept", "application/vnd.github+json".parse()?);
+        headers.insert("User-Agent", Self::USER_AGENT.parse()?);
 
-        if let Some(token) = &self.token {
+        if let Some(token) = &args.token {
             let auth_value = format!("Bearer {token}");
-            headers.insert("Authorization", auth_value.parse().unwrap());
+            headers.insert("Authorization", auth_value.parse()?);
         }
 
-        Client::builder()
-            .default_headers(headers)
-            .build()
-            .expect("Failed to create HTTP client")
+        let client = Client::builder().default_headers(headers).build()?;
+        Ok(Self { args, client })
     }
 
     pub async fn assets(&self) -> Result<BTreeSet<Asset>> {
-        let client = self.client();
         let url = format!(
             "https://api.github.com/repos/{}/{}/releases/tags/{}",
-            self.owner, self.repo, self.tag
+            self.args.owner, self.args.repo, self.args.tag
         );
 
-        let response = client.get(&url).send().await?;
+        let response = self.client.get(&url).send().await?;
         let release: Release = response.json().await?;
 
         let assets = release
@@ -200,7 +205,8 @@ impl GitHub {
             .into_iter()
             .filter_map(Asset::known)
             .filter(|asset| {
-                self.filter.is_empty() || self.filter.iter().any(|f| asset.name.contains(f))
+                self.args.filter.is_empty()
+                    || self.args.filter.iter().any(|f| asset.name.contains(f))
             })
             .collect::<BTreeSet<_>>();
 
@@ -208,13 +214,12 @@ impl GitHub {
     }
 
     pub async fn report(&self, report: Report) -> Result<()> {
-        let client = self.client();
         let url = format!(
             "https://api.github.com/repos/{}/{}/issues",
-            self.owner, self.repo
+            self.args.owner, self.args.repo
         );
 
-        client.post(&url).json(&report).send().await?;
+        self.client.post(&url).json(&report).send().await?;
         Ok(())
     }
 }
