@@ -108,7 +108,7 @@ jobs:
         run: cargo build --release --target x86_64-unknown-linux-musl
 
       - name: upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: dispatch-linux-x86_64
           path: target/x86_64-unknown-linux-musl/release/dispatch
