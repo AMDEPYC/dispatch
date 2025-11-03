@@ -71,6 +71,10 @@ impl AvahiService {
     pub async fn register(&self, name: &str, port: u16, txt: &[(&str, &str)]) -> Result<()> {
         let service_type = format!("_{name}._tcp");
 
+        // Generate a random suffix to avoid service name collisions on the network.
+        let random_suffix: u16 = rand::random();
+        let service_name = format!("{name}-{random_suffix:04x}");
+
         // Convert TXT records to the format expected by Avahi
         let txt: Vec<Vec<u8>> = txt
             .iter()
@@ -84,7 +88,7 @@ impl AvahiService {
         // domain: "" (use default)
         // host: "" (use local hostname)
         self.entry_group
-            .add_service(-1, 0, 0, name, &service_type, "", "", port, txt)
+            .add_service(-1, 0, 0, &service_name, &service_type, "", "", port, txt)
             .await
             .context("Failed to add service")?;
 
