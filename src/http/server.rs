@@ -49,11 +49,31 @@ impl Server {
             attempt.stop()
         });
 
+        let mut client_builder = Client::builder().redirect(policy);
+        if github.is_private() {
+            // Build client with GitHub authentication if token is available
+            if let Some(token) = github.token() {
+                let mut headers = reqwest::header::HeaderMap::new();
+                headers.insert("Authorization", format!("token {token}").parse().unwrap());
+                headers.insert(
+                    "User-Agent",
+                    concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"))
+                        .parse()
+                        .unwrap(),
+                );
+                headers.insert(
+                    "Accept",
+                    "Accept: application/octet-stream".parse().unwrap(),
+                );
+                client_builder = client_builder.default_headers(headers);
+            }
+        }
+
         Ok(Self {
             listener,
             status,
             github,
-            client: Client::builder().redirect(policy).build()?,
+            client: client_builder.build()?,
             path,
         })
     }

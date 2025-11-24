@@ -55,6 +55,8 @@ impl<K, U> Knowable<K, U> {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
 pub struct Asset<T = Type> {
+    /// (Asset) ID needed to download assets from private repositories
+    pub id: u64,
     pub name: String,
     pub size: u64,
 
@@ -68,6 +70,7 @@ pub struct Asset<T = Type> {
 impl Asset<Knowable<Type, String>> {
     fn known(self) -> Option<Asset> {
         self.mime.known().map(|mime| Asset {
+            id: self.id,
             name: self.name,
             size: self.size,
             url: self.url,
@@ -115,6 +118,11 @@ pub struct GitHubArgs {
     /// Release tag to download assets from
     #[arg(short = 't', long)]
     pub tag: String,
+
+    /// Download Release Assets w/o supplying token, which doesn't work for
+    /// private repos.
+    #[arg(long)]
+    pub public: bool,
 
     /// Filter asset names
     #[arg(trailing_var_arg = true)]
@@ -243,6 +251,26 @@ impl GitHub {
         })
     }
 
+    /// Get the GitHub token if available
+    pub fn token(&self) -> Option<&str> {
+        self.args.token.as_deref()
+    }
+
+    /// Returns true if the repository is not public (i.e., `public` flag is false).
+    pub const fn is_private(&self) -> bool {
+        !self.args.public
+    }
+
+    /// Get the owner name
+    pub fn owner(&self) -> &str {
+        &self.args.owner
+    }
+
+    /// Get the repo name
+    pub fn repo(&self) -> &str {
+        &self.args.repo
+    }
+
     pub async fn assets(&self) -> Result<BTreeSet<Asset>> {
         let url = format!(
             "https://api.github.com/repos/{}/{}/releases/tags/{}",
@@ -250,6 +278,7 @@ impl GitHub {
         );
 
         let response = self.client.get(&url).send().await?;
+
         let release: Release = response.json().await?;
 
         let assets = release

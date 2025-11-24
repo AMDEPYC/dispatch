@@ -45,6 +45,46 @@ impl Service {
             path,
         }
     }
+
+    /// Build a reqwest request for an asset, handling private/public repos and method.
+    fn build_request(
+        gh: &GitHub,
+        asset: &Asset,
+        client: &Client,
+        method: &Method,
+    ) -> reqwest::RequestBuilder {
+        let url = if gh.is_private() {
+            format!(
+                "https://api.github.com/repos/{}/{}/releases/assets/{}",
+                gh.owner(),
+                gh.repo(),
+                asset.id
+            )
+        } else {
+            asset.url.clone()
+        };
+
+        let rb = match method {
+            &Method::HEAD => client.head(url),
+            _ => client.get(url), // fallback; you only use HEAD/GET here
+        };
+
+        if gh.is_private() {
+            // Required by GitHub asset API for private repos
+            rb.header("Accept", "application/octet-stream")
+        } else {
+            rb
+        }
+    }
+
+    fn inspect_response(response: &reqwest::Response) -> (reqwest::StatusCode, Option<&str>) {
+        let status_code = response.status();
+        let content_length = response
+            .headers()
+            .get("content-length")
+            .and_then(|v| v.to_str().ok());
+        (status_code, content_length)
+    }
 }
 
 impl hyper::service::Service<Request<Incoming>> for Service {
@@ -110,7 +150,21 @@ impl hyper::service::Service<Request<Incoming>> for Service {
                         None => return Ok(POWEROFF_EFI.reply(None, Type::Efi, EMPTY)),
 
                         // Send the request (possibly redirecting...)
-                        Some(asset) => (client.head(asset.url).send().await?, asset.mime),
+                        Some(asset) => {
+                            let request =
+                                Self::build_request(&github, &asset, &client, &Method::HEAD);
+
+                            match request.send().await {
+                                Ok(resp) => {
+                                    let (_status_code, _content_length) =
+                                        Self::inspect_response(&resp);
+                                    (resp, asset.mime)
+                                }
+                                Err(_e) => {
+                                    return Ok(EMPTY.reply(Code::BAD_GATEWAY, None, None));
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -122,9 +176,20 @@ impl hyper::service::Service<Request<Incoming>> for Service {
 
                         // Send the request (possibly redirecting...)
                         Some(asset) => {
-                            let response = client.get(asset.url).send().await?;
-                            status.lock().await.update().downloading(remote);
-                            (response, asset.mime)
+                            let request =
+                                Self::build_request(&github, &asset, &client, &Method::GET);
+
+                            match request.send().await {
+                                Ok(resp) => {
+                                    let (_status_code, _content_length) =
+                                        Self::inspect_response(&resp);
+                                    status.lock().await.update().downloading(remote);
+                                    (resp, asset.mime)
+                                }
+                                Err(_e) => {
+                                    return Ok(EMPTY.reply(Code::BAD_GATEWAY, None, None));
+                                }
+                            }
                         }
                     }
                 }
