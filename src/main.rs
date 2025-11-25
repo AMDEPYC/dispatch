@@ -46,8 +46,21 @@ struct Args {
     path: String,
 }
 
+/// Guard that ensures term settings are restored upon program exit
+struct CleanupGuard;
+
+impl Drop for CleanupGuard {
+    fn drop(&mut self) {
+        tui::cleanup();
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Create cleanup guard - will automatically reset term settings
+    // on program exit, even on panic and error
+    let _cleanup = CleanupGuard;
+
     // Parse arguments
     let args = Args::parse();
 
@@ -93,7 +106,6 @@ async fn main() -> Result<()> {
         _ = terminal_events(&mut events, status.clone()) => {}
     }
 
-    ratatui::restore();
     Ok(())
 }
 
